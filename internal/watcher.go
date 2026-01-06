@@ -223,20 +223,20 @@ func (w *Watcher) processFile(filePath string, info os.FileInfo) {
 	if isSvg {
 		// Copy SVG files as-is
 		if err := w.copyFile(filePath, outputPath); err != nil {
-			log.Printf("%s %s", colorize(colorRed, "[e]"), basename)
+			log.Printf("%s %s: %v", colorize(colorRed, "[e]"), basename, err)
 			return
 		}
 	} else {
 		// Generate webp (from webp or webm)
 		if err := w.generateThumb(filePath, outputPath, isWebm); err != nil {
-			log.Printf("%s %s", colorize(colorRed, "[e]"), basename)
+			log.Printf("%s %s: %v", colorize(colorRed, "[e]"), basename, err)
 			return
 		}
 	}
 
 	// Update database with current source file status after successful processing
 	if err := w.db.UpdateStatus(filePath, info); err != nil {
-		log.Printf("%s %s", colorize(colorRed, "[e]"), basename)
+		log.Printf("%s %s: %v", colorize(colorRed, "[e]"), basename, err)
 		return
 	}
 

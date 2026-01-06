@@ -63,5 +63,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -trimpath -a -o webp-watc
 FROM alpine:edge AS final
 RUN apk add --no-cache libwebp-tools libvpx
 COPY --from=builder /build/webp-watch-go /
+COPY --from=ffmpeg /usr/local /usr/local
 ENV DB_FILE=/db/webp-watch-go.gob
 ENTRYPOINT ["/webp-watch-go", "/input", "/output"]
