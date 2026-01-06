@@ -284,7 +284,6 @@ func (w *Watcher) generateThumb(inputPath, outputPath string, isWebm bool) error
 			"-i", inputPath,
 			"-ss", "1",
 			"-vframes", "1",
-			"-quality", fmt.Sprintf("%d", w.config.Quality),
 			"-y",
 			outputPath,
 		)
