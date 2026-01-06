@@ -1,0 +1,9 @@
+# binary
+tags-worker
+tags-worker.exe
+
+# ide
+.vscode/
+
+# db
+cache.gob
