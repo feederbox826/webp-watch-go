@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"tags-worker/internal"
+	"webp-watch-go/internal"
 )
 
 func mustAbs(path, name string) string {
@@ -24,7 +24,7 @@ func main() {
 	log.SetFlags(0)
 
 	if len(os.Args) != 3 {
-		log.Fatal("Usage: tags-worker <input-dir> <output-dir>")
+		log.Fatal("Usage: webp-watch-go <input-dir> <output-dir>")
 	}
 
 	inputDir := os.Args[1]
