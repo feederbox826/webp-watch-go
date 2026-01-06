@@ -58,10 +58,10 @@ RUN go mod download
 COPY . .
 
 # strip and trim
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -trimpath -a -o tags-worker .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -trimpath -a -o webp-watch-go .
 
 FROM alpine:edge AS final
 RUN apk add --no-cache libwebp-tools libvpx
-COPY --from=builder /build/tags-worker /
-ENTRYPOINT ["/tags-worker"]
-
+COPY --from=builder /build/webp-watch-go /
+ENV DB_FILE=/db/webp-watch-go.gob
+ENTRYPOINT ["/webp-watch-go", "/input", "/output"]

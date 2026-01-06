@@ -1,4 +1,4 @@
-module tags-worker
+module webp-watch-go
 
 go 1.24.0
 
