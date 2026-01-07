@@ -18,6 +18,7 @@ const (
 	colorRed     = "\033[0;31m"
 	colorMagenta = "\033[0;35m"
 	colorCyan    = "\033[0;36m"
+	colorGrey    = "\033[0;37m"
 )
 
 func colorize(color, text string) string {
@@ -81,7 +82,7 @@ func (w *Watcher) Start(ctx context.Context) {
 	log.Printf("Starting initial scan of %s", w.inputDir)
 	scanDone := make(chan struct{})
 	go func() {
-		w.scanDirectory(w.inputDir)
+		w.scanDirectory(ctx, w.inputDir)
 		close(scanDone)
 	}()
 
@@ -124,8 +125,15 @@ func (w *Watcher) shutdown() {
 	w.wg.Wait()
 }
 
-func (w *Watcher) scanDirectory(dir string) {
+func (w *Watcher) scanDirectory(ctx context.Context, dir string) {
 	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err() // Stop walking
+		default:
+		}
+
 		if err != nil {
 			log.Printf("Error walking %s: %v", path, err)
 			return nil // Continue walking despite errors
@@ -136,7 +144,13 @@ func (w *Watcher) scanDirectory(dir string) {
 		} else {
 			// Early filter: only queue processable files
 			if w.isProcessable(path) {
-				w.jobQueue <- fileJob{path: path, info: info}
+				// Use select to avoid sending on closed channel
+				select {
+				case <-ctx.Done():
+					return ctx.Err() // Stop walking
+				case w.jobQueue <- fileJob{path: path, info: info}:
+					// Successfully queued
+				}
 			}
 		}
 		return nil
@@ -242,7 +256,7 @@ func (w *Watcher) processFile(filePath string, info os.FileInfo) {
 
 	// Log completion
 	if isSvg {
-		log.Printf("%s %s", colorize(colorCyan, "[c]"), basename)
+		log.Printf("%s %s", colorize(colorGrey, "[c]"), basename)
 	} else if isWebm {
 		log.Printf("%s %s", colorize(colorMagenta, "[v]"), basename)
 	} else {
@@ -281,9 +295,10 @@ func (w *Watcher) generateThumb(inputPath, outputPath string, isWebm bool) error
 	if isWebm {
 		// Use ffmpeg to generate webp thumbnail from webm video
 		cmd = exec.Command("ffmpeg",
-			"-i", inputPath,
 			"-ss", "1",
-			"-vframes", "1",
+			"-i", inputPath,
+			"-frames:v", "1",
+			"-quality", fmt.Sprintf("%d", w.config.Quality),
 			"-y",
 			outputPath,
 		)
