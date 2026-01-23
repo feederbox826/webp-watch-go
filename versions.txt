@@ -1,0 +1,2 @@
+libwebp: 1.6.0-r0
+libvpx: 1.15.2-r0
