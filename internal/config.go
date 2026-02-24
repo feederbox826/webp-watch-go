@@ -17,11 +17,8 @@ type Config struct {
 func LoadConfig() *Config {
 	numCPU := runtime.NumCPU()
 	var defaultWorkers int
-	if numCPU == 1 { // 4 workers on single core
-		defaultWorkers = 4
-	} else { // otherwise scale to 2x cores
-		defaultWorkers = numCPU * 2
-	}
+	// now with webm, don't scale past cores
+	defaultWorkers = numCPU
 
 	return &Config{
 		Quality:      getEnvInt("QUALITY", 80),
