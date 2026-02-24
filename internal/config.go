@@ -7,9 +7,11 @@ import (
 )
 
 type Config struct {
-	Quality int
-	DBFile  string
-	Workers int
+	Quality      int
+	VideoQuality int
+	DBFile       string
+	SkipDB       bool
+	Workers      int
 }
 
 func LoadConfig() *Config {
@@ -22,9 +24,11 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		Quality: getEnvInt("QUALITY", 80),
-		DBFile:  getEnv("DB_FILE", "./cache.gob"),
-		Workers: getEnvInt("WORKERS", defaultWorkers),
+		Quality:      getEnvInt("QUALITY", 80),
+		VideoQuality: getEnvInt("VIDEO_QUALITY", 28),
+		DBFile:       getEnv("DB_FILE", "./cache.gob"),
+		SkipDB:       getEnv("SKIP_DB", "false") == "true",
+		Workers:      getEnvInt("WORKERS", defaultWorkers),
 	}
 }
 

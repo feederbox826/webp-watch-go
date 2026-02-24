@@ -26,10 +26,11 @@ RUN ./configure \
   --enable-libvpx \
   --enable-decoder=vp8,vp9,opus \
   --enable-demuxer=webm,matroska \
+  --enable-bsf=vp9_metadata,vp9_superframe,vp9_superframe_split,vp9_raw_reorder \
   # WebP support
   --enable-libwebp \
-  --enable-encoder=libwebp \
-  --enable-muxer=webp,image2 \
+  --enable-encoder=libwebp,libvpx_vp9 \
+  --enable-muxer=webm,webp,image2 \
   # reading/writing files
   --enable-protocol=file \
   # compilation runtime options

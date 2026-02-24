@@ -16,6 +16,7 @@ import (
 const (
 	colorReset   = "\033[0m"
 	colorRed     = "\033[0;31m"
+	colorBlue    = "\033[0;34m"
 	colorMagenta = "\033[0;35m"
 	colorCyan    = "\033[0;36m"
 	colorGrey    = "\033[0;37m"
@@ -207,7 +208,7 @@ func (w *Watcher) processFile(filePath string, info os.FileInfo) {
 	basename := filepath.Base(filePath)
 
 	// Check if file needs processing
-	needsProcessing, err := w.db.NeedsProcessing(filePath, info)
+	dbNeedsProcessing, err := w.db.NeedsProcessing(filePath, info)
 	if err != nil {
 		log.Printf("%s Error checking db: %v", colorize(colorRed, "[e]"), err)
 		return
@@ -217,12 +218,20 @@ func (w *Watcher) processFile(filePath string, info os.FileInfo) {
 	ext := filepath.Ext(filePath)
 	isWebm := ext == ".webm"
 	isSvg := ext == ".svg"
-	outputPath := w.getOutputPath(filePath, ext)
+	outputPath := w.getOutputPath(filePath, ext, true)
+	videoOutputPath := w.getOutputPath(filePath, ext, false)
+	needsProcessing := false
+	videoNeedsProcessing := false
 
 	// Only check output file if database says we don't need processing
 	// This avoids redundant stat calls when we know we need to process
-	if !needsProcessing {
-		if targetFile, err := os.Stat(outputPath); err == nil && targetFile.Size() > 0 {
+	if !dbNeedsProcessing {
+		targetFile, err := os.Stat(outputPath)
+		needsProcessing = err != nil || targetFile.Size() == 0
+
+		videoTargetFile, videoErr := os.Stat(videoOutputPath)
+		videoNeedsProcessing = videoErr != nil || videoTargetFile.Size() == 0
+		if !needsProcessing && !videoNeedsProcessing {
 			// File exists and is up to date, skip processing
 			return
 		}
@@ -234,18 +243,35 @@ func (w *Watcher) processFile(filePath string, info os.FileInfo) {
 		return
 	}
 
-	if isSvg {
+	if isSvg { // cheap copy, why not
 		// Copy SVG files as-is
 		if err := w.copyFile(filePath, outputPath); err != nil {
 			log.Printf("%s %s: %v", colorize(colorRed, "[e]"), basename, err)
 			return
 		}
-	} else {
+		log.Printf("%s %s", colorize(colorGrey, "[c]"), basename)
+	}
+	if needsProcessing {
 		// Generate webp (from webp or webm)
 		if err := w.generateThumb(filePath, outputPath, isWebm); err != nil {
 			log.Printf("%s %s: %v", colorize(colorRed, "[e]"), basename, err)
 			return
 		}
+		if isWebm {
+			log.Printf("%s %s", colorize(colorMagenta, "[t]"), basename)
+		} else {
+			log.Printf("%s %s", colorize(colorCyan, "[i]"), basename)
+		}
+	}
+	// create optimized video from webm
+	if videoNeedsProcessing && isWebm && w.config.VideoQuality > 0 {
+		if err := w.generateOptimizedVideo(filePath, videoOutputPath); err != nil {
+			log.Printf("%s %s: %v", colorize(colorRed, "[e]"), basename, err)
+			// remove partial file
+			os.Remove(videoOutputPath)
+			return
+		}
+		log.Printf("%s %s", colorize(colorBlue, "[v]"), basename)
 	}
 
 	// Update database with current source file status after successful processing
@@ -255,16 +281,10 @@ func (w *Watcher) processFile(filePath string, info os.FileInfo) {
 	}
 
 	// Log completion
-	if isSvg {
-		log.Printf("%s %s", colorize(colorGrey, "[c]"), basename)
-	} else if isWebm {
-		log.Printf("%s %s", colorize(colorMagenta, "[v]"), basename)
-	} else {
-		log.Printf("%s %s", colorize(colorCyan, "[i]"), basename)
-	}
+
 }
 
-func (w *Watcher) getOutputPath(inputPath string, ext string) string {
+func (w *Watcher) getOutputPath(inputPath string, ext string, thumb bool) string {
 	relPath, err := filepath.Rel(w.inputDir, inputPath)
 	if err != nil {
 		relPath = filepath.Base(inputPath)
@@ -273,7 +293,7 @@ func (w *Watcher) getOutputPath(inputPath string, ext string) string {
 	outputPath := filepath.Join(w.outputDir, relPath)
 
 	// Only webm files get .webp appended, others keep their extension
-	if ext == ".webm" {
+	if ext == ".webm" && thumb {
 		outputPath += ".webp"
 	}
 
@@ -290,11 +310,37 @@ func (w *Watcher) watchDirectory(path string) {
 	}
 }
 
+func (w *Watcher) generateOptimizedVideo(inputPath, outputPath string) error {
+	// Use ffmpeg to generate optimized video from webm
+	cmd := exec.Command("ffmpeg",
+		"-hide_banner",
+		"-loglevel", "error",
+		"-i", inputPath,
+		"-c:v", "libvpx-vp9",
+		"-b:v", "0",
+		"-crf", fmt.Sprintf("%d", w.config.VideoQuality),
+		"-row-mt", "1",
+		"-tile-columns", "2",
+		"-c:a", "copy",
+		"-y",
+		outputPath,
+	)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("error: %w, output: %s", err, string(output))
+	}
+
+	return nil
+}
+
 func (w *Watcher) generateThumb(inputPath, outputPath string, isWebm bool) error {
 	var cmd *exec.Cmd
 	if isWebm {
 		// Use ffmpeg to generate webp thumbnail from webm video
 		cmd = exec.Command("ffmpeg",
+			"-hide_banner",
+			"-loglevel", "error",
 			"-ss", "1",
 			"-i", inputPath,
 			"-frames:v", "1",
