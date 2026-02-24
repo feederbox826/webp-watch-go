@@ -9,7 +9,8 @@ RUN cmake -B build -G Ninja \
   -DCMAKE_INSTALL_LIBDIR=lib \
   -DBUILD_SHARED_LIBS=True \
   -DCMAKE_BUILD_TYPE=Release \
-  -DENABLE_ASM=ON
+  -DENABLE_ASM=ON \
+  -DENABLE_X86_ASM=OFF
 RUN cmake --build build
 RUN cmake --install build
 
